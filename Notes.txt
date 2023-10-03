@@ -1,0 +1,4 @@
+dashboardBrand(
+    title = "Website Theme Analysis",
+    color = "gray-dark",
+    image = "theme_logo.png")
