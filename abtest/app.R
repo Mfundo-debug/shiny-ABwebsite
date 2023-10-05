@@ -2,168 +2,208 @@ library(shiny)
 library(bs4Dash)
 library(tidyverse)
 library(DT)
-library(plotly)
-
-# Load the data
-data <- read.csv("website_ab_test.csv")
+library(waiter)
+library(highcharter)
+library(reactable)
 
 # Define the UI function for the Shiny app
-ui <- bs4DashPage(
-  header = bs4DashNavbar(
-    title = "Website A/B Test",
-    rightSidebarIcon = "bars"
-  ),
-  sidebar = bs4DashSidebar(
-    bs4SidebarMenuItem(
-      tabName = "home",
-      text = "Home",
-      icon = shiny::icon("home")
-    ),
-    bs4SidebarMenuItem(
-      tabName = "data",
-      text = "Data",
-      icon = shiny::icon("table")
-    ),
-    bs4SidebarMenuItem(
-      tabName = "analysis",
-      text = "Analysis",
-      icon = shiny::icon("chart-bar")
-    )
-  ),
-  body = bs4DashBody(
-    bs4TabItems(
-      bs4TabItem(
-        tabName = "home",
-        bs4InfoBox(
-          title = "Welcome to the Website A/B Test",
-          subtitle = "This is a simple Shiny app to demonstrate the use of the bs4Dash package.",
-          icon = shiny::icon("chart-line")
-        )
-      ),
-      bs4TabItem(
-        tabName = "data",
-        dataTableOutput("data_table")
+ui <- dashboardPage(
+  dashboardHeader(title = dashboardBrand(
+    title = "Theme Analysis",
+    color = "gray-dark",
+    image = "theme_logo.png")),
+  dashboardSidebar(
+    skin ="light",
+    status = "gray-dark",
+    sidebarMenu(
+      menuItem("home", tabName ="home", icon = icon("home")),
+      menuItem("data", tabName = "data", icon=icon("database")),
+      menuItem("analysis", tabName = "analysis", icon = icon("chart-bar")))
+  ),#end of sidebar
+  
+  dashboardBody(
+    tabItems(
+      tabItem("home",
+              fluidRow(
+                column(4, valueBoxOutput("average_site_click_through_rate", width=12)),
+                column(4, valueBoxOutput("average_light_theme_click_through_rate", width=12)),
+                column(4, valueBoxOutput("average_dark_theme_click_through_rate", width = 12))
+              ),
+              fluidRow(
+                column(6, box(title="Light Theme Click Through Rate", solidHeader = TRUE,
+                              height=380, icon = icon("chart-area"), width=12,
+                              highchartOutput("light_theme_click_through_rate_distribution_chart", height=360))),
+                column(6, box(title = "Dark Theme Click Through Rate", solidHeader = TRUE,
+                              height = 380, icon = icon("chart-area"), width = 12,
+                              highchartOutput("dark_theme_click_through_rate_distribution_chart", height=360)))
+              ),
+              fluidRow(
+                box(title = "Site Duration", solidHeader = TRUE,
+                    height = 380, icon = icon("chart-bar"), width=12,
+                    highchartOutput("site_duration_by_location_chart", height = 360))
+              ),
+      ),#end of the tab item- home
+      tabItem("data",
+              dataTableOutput("data_table")
         
-      ),
-      bs4TabItem(
-        tabName = "analysis",
-        bs4InfoBox(
-          title = "Analysis",
-          color = "primary",
-          #solidHeader = TRUE,
-          #collapsible = TRUE,
-          width = 12,
-          plotlyOutput("plot"),
-          verbatimTextOutput("summary"),
-          plotOutput("ctr_plot"),  # Display Click Through Rate plot
-          plotOutput("br_plot"),   # Display Bounce Rate plot
-          plotOutput("sd_plot"),   # Display Session Duration plot
-          verbatimTextOutput("ttest_ctrr"),  # Display Click Through Rate t-test results
-          verbatimTextOutput("ttest_crr"),   # Display Conversion Rate t-test results
-          verbatimTextOutput("ttest_brr"),   # Display Bounce Rate t-test results
-          plotOutput("hist_brr")
-        )
-      )
+      ),#end of tab -data
+      tabItem("analysis",
+              box(
+                title = "hypothesis testing",
+                solidHeader = TRUE,
+                status = "primary",
+                width = 12,
+                textOutput("ttest_ctrr"),
+                textOutput("ttest_crr"),
+                textOutput("ttest_brr")
+              ))
     )
-  )
-)
+    
+  )#end of the body
+)#end of page
 
-# Define the server function for the Shiny app
-server <- function(input, output) {
-  #data table
+server <- function(input, output, session) {
+  
+  # Reactive function to process the data
+  website_interaction_df <- reactive({
+    read_csv("website_ab_test.csv") %>%
+      mutate(Session_Duration = round(Session_Duration/60, 0),
+             Theme = factor(Theme, levels = c("Light Theme", "Dark Theme"), ordered = TRUE),
+             `Click Through Rate` = `Click Through Rate` * 100)
+  })
+#   
+  # Hypothesis Testing
+  output$ttest_ctrr <- renderText({
+    light_theme_ctrr <- website_interaction_df()[website_interaction_df()$Theme == 'Light Theme', 'Click Through Rate']
+    dark_theme_ctrr <- website_interaction_df()[website_interaction_df()$Theme == 'Dark Theme', 'Click Through Rate']
+
+    t_test_result_ctrr <- t.test(light_theme_ctrr, dark_theme_ctrr)
+
+    paste("Click Through Rate Hypothesis Testing:",
+          "t-statistic:", round(t_test_result_ctrr$statistic, 2),
+          "p-value:", round(t_test_result_ctrr$p.value, 4))
+  })
+#   
+  # Perform a t-test to compare two themes for Conversion Rate
+  output$ttest_crr <- renderText({
+    light_theme_crr <- website_interaction_df()[website_interaction_df()$Theme == 'Light Theme', 'Conversion Rate']
+    dark_theme_crr <- website_interaction_df()[website_interaction_df()$Theme == 'Dark Theme', 'Conversion Rate']
+
+    t_test_result_crr <- t.test(light_theme_crr, dark_theme_crr)
+
+    paste("Conversion Rate Hypothesis Testing:",
+          "t-statistic:", round(t_test_result_crr$statistic, 2),
+          "p-value:", round(t_test_result_crr$p.value, 4))
+  })
+#   
+  # Perform a t-test to compare two themes for Bounce Rate
+  output$ttest_brr <- renderText({
+    light_theme_brr <- website_interaction_df()[website_interaction_df()$Theme == 'Light Theme', 'Bounce Rate']
+    dark_theme_brr <- website_interaction_df()[website_interaction_df()$Theme == 'Dark Theme', 'Bounce Rate']
+
+    t_test_result_brr <- t.test(light_theme_brr, dark_theme_brr)
+
+    paste("Bounce Rate Hypothesis Testing:",
+          "t-statistic:", round(t_test_result_brr$statistic, 2),
+          "p-value:", round(t_test_result_brr$p.value, 4))
+  })
+#   
+  # Data table
   output$data_table <- DT::renderDataTable({
     datatable(
-      data,
+      website_interaction_df(),
       options = list(
-        columnDefs = list(list(className='dt-center', targets ='_all'))
+        columnDefs = list(list(className='dt-center', targets='_all'))
       ),
       rownames = FALSE
     )
   })
-  # Calculate the CTR for each theme
-  light_theme_ctr <- mean(data[data$Theme == 'Light Theme', 'Click Through Rate'])
-  dark_theme_ctr <- mean(data[data$Theme == 'Dark Theme', 'Click Through Rate'])
-  
-  # Plot the CTR for each theme
-  output$ctr_plot <- renderPlot({
-    bar_colors <- c('red', 'green')
-    bar_heights <- c(light_theme_ctr, dark_theme_ctr)
-    bar_labels <- c('Light Theme', 'Dark Theme')
-    
-    barplot(bar_heights, names.arg = bar_labels, col = bar_colors,
-            main = 'Click Through Rate by Theme', xlab = 'Theme', ylab = 'Click Through Rate')
+#   
+  # Average Click Through Rate
+  output$average_site_click_through_rate <- renderValueBox({
+    valueBox(
+      value = paste0(round(mean(website_interaction_df()$`Click Through Rate`),2), " %"),
+      subtitle = "Average Site Click Through Rate",
+      color = "olive",
+      icon = icon("arrow-pointer")
+    )
   })
-  
-  # Calculate the Bounce Rate for each theme
-  light_theme_br <- mean(data[data$Theme == 'Light Theme', 'Bounce Rate'])
-  dark_theme_br <- mean(data[data$Theme == 'Dark Theme', 'Bounce Rate'])
-  
-  # Plot the Bounce Rate for each theme
-  output$br_plot <- renderPlot({
-    bar_colors <- c('blue', 'purple')
-    bar_heights <- c(light_theme_br, dark_theme_br)
-    bar_labels <- c('Light Theme', 'Dark Theme')
-    
-    barplot(bar_heights, names.arg = bar_labels, col = bar_colors,
-            main = 'Average Bounce Rate by Theme', xlab = 'Theme', ylab = 'Bounce Rate')
-  })
-  
-  # Calculate the Session Duration for each theme
-  light_theme_sd <- mean(data[data$Theme == 'Light Theme', 'Session Duration'])
-  dark_theme_sd <- mean(data[data$Theme == 'Dark Theme', 'Session Duration'])
-  
-  # Plot the Session Duration for each theme
-  output$sd_plot <- renderPlot({
-    bar_colors <- c('orange', 'green')
-    bar_heights <- c(light_theme_sd, dark_theme_sd)
-    bar_labels <- c('Light Theme', 'Dark Theme')
-    
-    barplot(bar_heights, names.arg = bar_labels, col = bar_colors,
-            main = 'Session Duration by Theme', xlab = 'Theme', ylab = 'Session Duration')
-  })
-  
-  # Perform a t-test to compare two themes for Click Through Rate
-  light_theme_ctrr <- data[data$Theme == 'Light Theme', 'Click Through Rate']
-  dark_theme_ctrr <- data[data$Theme == 'Dark Theme', 'Click Through Rate']
-  
-  t_test_result_ctrr <- t.test(light_theme_ctrr, dark_theme_ctrr)
-  
-  output$ttest_ctrr <- renderPrint({
-    cat('t-statistic:', t_test_result_ctrr$statistic, '\n')
-    cat('p-value:', t_test_result_ctrr$p.value, '\n')
-  })
-  
-  # Perform a t-test to compare two themes for Conversion Rate
-  light_theme_crr <- data[data$Theme == 'Light Theme', 'Conversion Rate']
-  dark_theme_crr <- data[data$Theme == 'Dark Theme', 'Conversion Rate']
-  
-  t_test_result_crr <- t.test(light_theme_crr, dark_theme_crr)
-  
-  output$ttest_crr <- renderPrint({
-    cat('t-statistic:', t_test_result_crr$statistic, '\n')
-    cat('p-value:', t_test_result_crr$p.value, '\n')
-  })
-  
-  # Perform a t-test to compare two themes for Bounce Rate
-  light_theme_brr <- data[data$Theme == 'Light Theme', 'Bounce Rate']
-  dark_theme_brr <- data[data$Theme == 'Dark Theme', 'Bounce Rate']
-  
-  t_test_result_brr <- t.test(light_theme_brr, dark_theme_brr)
-  
-  output$ttest_brr <- renderPrint({
-    cat('t-statistic:', t_test_result_brr$statistic, '\n')
-    cat('p-value:', t_test_result_brr$p.value, '\n')
-  })
-  
-  # Plot histograms for Bounce Rate
-  output$hist_brr <- renderPlot({
-    par(mfrow = c(1, 2))
-    hist(light_theme_brr, col = 'orange', alpha = 0.5,
-         main = 'Bounce Rate Histogram by Theme (Light Theme)')
-    hist(dark_theme_brr, col = 'green', alpha = 0.5,
-         main = 'Bounce Rate Histogram by Theme (Dark Theme)')
-  })
-}
 
-# Run the Shiny app
+  # Average Light Theme Click Through Rate
+  output$average_light_theme_click_through_rate <- renderValueBox({
+    valueBox(
+      value = paste0(round(mean(website_interaction_df()[website_interaction_df()$Theme == 'Light Theme', 'Click Through Rate']$`Click Through Rate`),2), " %"),
+      subtitle = "Average Light Theme Click Through Rate",
+      color = "olive",
+      icon = icon("arrow-pointer")
+    )
+  })
+
+  # Average Dark Theme Click Through Rate
+  output$average_dark_theme_click_through_rate <- renderValueBox({
+    valueBox(
+      value = paste0(round(mean(website_interaction_df()[website_interaction_df()$Theme == 'Dark Theme', 'Click Through Rate']$`Click Through Rate`),2), " %"),
+      subtitle = "Average Dark Theme Click Through Rate",
+      color = "olive",
+      icon = icon("arrow-pointer")
+    )
+  })
+   
+  # Create Light Theme Click Through Rate distribution chart
+  output$light_theme_click_through_rate_distribution_chart <- renderHighchart({
+    website_interaction_df() %>% 
+      filter(Theme %in% c("Light Theme")) %>% 
+      select(`Click Through Rate`) %>% 
+      pull(`Click Through Rate`) %>% 
+      hchart(name = "Light Theme") %>% 
+      hc_title(text = "Light Theme Click Through Rate Distribution") %>%
+      hc_xAxis(title = list(text = "Click Through Rate (%)"),
+               labels = list(format =  "{value}%")) %>% 
+      hc_yAxis(title = list(text = "Count"),
+               labels = list(format = "{value}")) %>% 
+      hc_add_theme(
+        hc_theme(chart = list(
+          backgroundColor = "white")))
+  })
+  col = "teal"
+  # Create Dark Theme Click Through Rate distribution chart
+  output$dark_theme_click_through_rate_distribution_chart <- renderHighchart({
+    website_interaction_df() %>% 
+      filter(Theme %in% c("Dark Theme")) %>% 
+      select(`Click Through Rate`) %>% 
+      pull(`Click Through Rate`) %>% 
+      hchart(name = "Dark Theme", color=col) %>% 
+      hc_title(text = "Dark Theme Click Through Rate Distribution") %>%
+      hc_xAxis(title = list(text = "Click Through Rate (%)"),
+               labels = list(format =  "{value}%")) %>% 
+      hc_yAxis(title = list(text = "Count"),
+               labels = list(format = "{value}")) %>% 
+      hc_add_theme(
+        hc_theme(
+          chart = list(
+          backgroundColor = "white")))
+  })
+
+  # Create Site Duration by Location chart
+  output$site_duration_by_location_chart <- renderHighchart({
+    website_interaction_df() %>% 
+      group_by(Location, Theme) %>%
+      summarise(average_session_duration = round(mean(Session_Duration),2)) %>% 
+      arrange(desc(average_session_duration)) %>% 
+      hchart("column",hcaes(x = Location, y = average_session_duration, group = Theme), 
+             dataLabels = list(enabled = TRUE, format = "{y}")) %>% 
+      hc_title(
+        text = paste0("Average Site Duration by location (in Minutes)")
+      ) %>% 
+      hc_xAxis(title = list(text = "Location")) %>% 
+      hc_yAxis(title = list(text = "Average Session Duration (Minutes)"),
+               labels = list(format = "{value}")) %>% 
+      hc_legend(title = list(text = "Theme")) %>%
+      hc_add_theme(
+        hc_theme(
+        chart = list(
+          backgroundColor = "white")))
+  })
+  
+  }                                
 shinyApp(ui, server)
