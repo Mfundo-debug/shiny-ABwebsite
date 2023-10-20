@@ -16,8 +16,9 @@ ui <- dashboardPage(
     skin ="light",
     status = "gray-dark",
     sidebarMenu(
-      menuItem("home", tabName ="home", icon = icon("home")),
+      menuItem("Click Through Rate", tabName ="home", icon = icon("home")),
       menuItem("data", tabName = "data", icon=icon("database")),
+      menuItem("Conversion Rate", tabName = "Conversion Rate", icon = icon("percent")),
       menuItem("analysis", tabName = "analysis", icon = icon("chart-bar")))
   ),#end of sidebar
   
@@ -47,6 +48,20 @@ ui <- dashboardPage(
               dataTableOutput("data_table")
         
       ),#end of tab -data
+      tabItem("Conversion Rate",
+              fluidRow(
+                column(6, valueBoxOutput("average_light_theme_conv_rate", width=12)),
+                column(6, valueBoxOutput("average_dark_theme_conv_rate", width=12)),
+              ),
+              fluidRow(
+                column(6, box(title = "Light Theme Conversion Rate", solidHeader = TRUE,
+                              height = 380, width = 12,
+                              highchartOutput("light_theme_conv_rate_dist_chart", height = 360))),
+                column(6, box(title = "Dark Theme Conversion Rate", solidHeader = TRUE,
+                              height = 380, width =12,
+                              highchartOutput("dark_theme_conv_rate_dist_chart", height = 360))),
+              )
+              ),#end of conv rate
       tabItem("analysis",
               box(
                 title = "hypothesis testing",
@@ -148,6 +163,24 @@ server <- function(input, output, session) {
       icon = icon("arrow-pointer")
     )
   })
+  #Average Light Theme Conversion Rate
+  output$average_light_theme_conv_rate <- renderValueBox({
+    valueBox(
+      value = paste0(round(mean(website_interaction_df()[website_interaction_df()$Theme == 'Light Theme', 'Conversion Rate']$`Conversion Rate`),2), "%"),
+      subtitle = "Average Light Theme Conversion Rate",
+      color = "lime",
+      icon = icon("percent")
+    )
+  })
+  #Average Dark Theme Conversion Rate
+  output$average_dark_theme_conv_rate <- renderValueBox({
+    valueBox(
+      value = paste0(round(mean(website_interaction_df()[website_interaction_df()$Theme == 'Dark Theme', 'Conversion Rate']$`Conversion Rate`),2), "%"),
+      subtitle = "Average Dark Theme Conversion Rate",
+      color = "lime",
+      icon = icon("percent")
+    )
+  })
    
   # Create Light Theme Click Through Rate distribution chart
   output$light_theme_click_through_rate_distribution_chart <- renderHighchart({
@@ -183,7 +216,47 @@ server <- function(input, output, session) {
           chart = list(
           backgroundColor = "white")))
   })
-
+  # create light theme conversion rate distribution chart
+  output$light_theme_conv_rate_dist_chart <- renderHighchart({
+    website_interaction_df() %>%
+      filter(Theme %in% c("Light Theme")) %>%
+      select(`Conversion Rate`) %>%
+      pull(`Conversion Rate`) %>%
+      hchart(name="Light Theme", color = col) %>%
+      hc_title(text = "Light Theme Conversion Rate Distribution") %>%
+      hc_xAxis(title = list(text = "Conversion Rate (%)"),
+               labels = list(format = "{value}%")) %>%
+      hc_yAxis(title = list(text = "Count"),
+               labels = list(format = "{value}")) %>%
+      hc_add_theme(
+        hc_theme(
+          chart = list(
+            backgroundColor = "white"
+          )
+        )
+      )
+  })
+#create dark theme conversion rate distribution chart
+  
+  output$dark_theme_conv_rate_dist_chart <- renderHighchart({
+    website_interaction_df() %>%
+      filter(Theme %in% c("Dark Theme")) %>%
+      select(`Conversion Rate`) %>%
+      pull(`Conversion Rate`) %>%
+      hchart(name="Dark Theme", color = col) %>%
+      hc_title(text = "Dark Theme Conversion Rate Distribution") %>%
+      hc_xAxis(title = list(text = "Conversion Rate (%)"),
+               labels = list(format = "{value}%")) %>%
+      hc_yAxis(title = list(text = "Count"),
+               labels = list(format = "{value}")) %>%
+      hc_add_theme(
+        hc_theme(
+          chart = list(
+            backgroundColor = "white"
+          )
+        )
+      )
+  })
   # Create Site Duration by Location chart
   output$site_duration_by_location_chart <- renderHighchart({
     website_interaction_df() %>% 

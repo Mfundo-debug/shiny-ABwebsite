@@ -1,0 +1,18 @@
+ bs4SidebarMenuItem(
+      tabName = "home",
+      text = "home",
+      icon = shiny:: icon("home")
+    ),
+    bs4SidebarMenuItem(
+      tabName = "data",
+      text = "Data",
+      icon = shiny::icon("table")
+    ),
+    bs4SidebarMenuItem(
+      tabName = "analysis",
+      text = "Analysis",
+      icon = shiny::icon("chart-bar")
+    )),
+    
+    
+    : primary, secondary, info, success, warning, danger, gray-dark, gray, white, indigo, lightblue, navy, purple, fuchsia, pink, maroon, orange, lime, teal, olive.
