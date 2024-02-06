@@ -18,7 +18,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Click Through Rate", tabName ="home", icon = icon("home")),
       menuItem("data", tabName = "data", icon=icon("database")),
-      menuItem("Conversion Rate", tabName = "Conversion Rate", icon = icon("percent")),
+      menuItem("Conversion Rate", tabName = "Conversion_Rate", icon = icon("percent")),
       menuItem("analysis", tabName = "analysis", icon = icon("chart-bar")))
   ),#end of sidebar
   
@@ -48,7 +48,7 @@ ui <- dashboardPage(
               dataTableOutput("data_table")
         
       ),#end of tab -data
-      tabItem("Conversion Rate",
+      tabItem("Conversion_Rate",
               fluidRow(
                 column(6, valueBoxOutput("average_light_theme_conv_rate", width=12)),
                 column(6, valueBoxOutput("average_dark_theme_conv_rate", width=12)),
@@ -70,7 +70,8 @@ ui <- dashboardPage(
                 width = 12,
                 textOutput("ttest_ctrr"),
                 textOutput("ttest_crr"),
-                textOutput("ttest_brr")
+                textOutput("ttest_brr"),
+                dataTableOutput("ttest_table")
               ))
     )
     
@@ -122,7 +123,20 @@ server <- function(input, output, session) {
           "t-statistic:", round(t_test_result_brr$statistic, 2),
           "p-value:", round(t_test_result_brr$p.value, 4))
   })
-#   
+# tabulate the hypothesis testing results
+  output$ttest_table <- renderDataTable({
+    t_test_results <- data.frame(
+      metric = c("Click Through Rate", "Conversion Rate", "Bounce Rate"),
+      t_statistic = c(round(t_test_result_ctrr$statistic, 2),
+                      round(t_test_result_crr$statistic, 2),
+                      round(t_test_result_brr$statistic, 2)),
+      p_value = c(round(t_test_result_ctrr$p.value, 4),
+                  round(t_test_result_crr$p.value, 4),
+                  round(t_test_result_brr$p.value, 4))
+    )
+    datatable(t_test_results, rownames = FALSE)
+  })
+  # 
   # Data table
   output$data_table <- DT::renderDataTable({
     datatable(
@@ -276,6 +290,19 @@ server <- function(input, output, session) {
         hc_theme(
         chart = list(
           backgroundColor = "white")))
+  })
+  # hypothesis testing results tabulated called here in
+  output$ttest_table <- renderDataTable({
+    t_test_results <- data.frame(
+      metric = c("Click Through Rate", "Conversion Rate", "Bounce Rate"),
+      t_statistic = c(round(t_test_result_ctrr$statistic, 2),
+                      round(t_test_result_crr$statistic, 2),
+                      round(t_test_result_brr$statistic, 2)),
+      p_value = c(round(t_test_result_ctrr$p.value, 4),
+                  round(t_test_result_crr$p.value, 4),
+                  round(t_test_result_brr$p.value, 4))
+    )
+    datatable(t_test_results, rownames = FALSE)
   })
   
   }                                
